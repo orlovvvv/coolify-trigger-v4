@@ -187,7 +187,7 @@ services:
       REGISTRY_STORAGE_DELETE_ENABLED: "true"
       REGISTRY_LOG_LEVEL: info
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5000/v2/"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5000/"]
       interval: 10s
       timeout: 5s
       retries: 5
