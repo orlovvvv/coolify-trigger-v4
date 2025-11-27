@@ -212,69 +212,49 @@ services:
       retries: 5
       start_period: 10s
 
-  supervisor:
-    networks:
-      - trigger-net
-    image: "ghcr.io/triggerdotdev/supervisor:v4-beta"
-    restart: unless-stopped
-    depends_on:
-      - docker-proxy
-      - trigger
-      - registry
-    user: root
-    command: "sh -c \"chown -R node:node /home/node/shared && exec /usr/bin/dumb-init -- pnpm run --filter supervisor start\"\n"
-    environment:
-      TRIGGER_API_URL: http://trigger:3000
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://trigger:3000/otel
-      TRIGGER_WORKER_TOKEN: "file:///home/node/shared/worker_token"
-      MANAGED_WORKER_SECRET: ${SERVICE_PASSWORD_MANAGEDWORKER}
-      TRIGGER_WORKLOAD_API_DOMAIN: supervisor
-      TRIGGER_WORKLOAD_API_PORT_EXTERNAL: 8020
-      DOCKER_HOST: tcp://docker-proxy:2375
-      DOCKER_RUNNER_NETWORKS: ${DOCKER_RUNNER_NETWORKS:-trigger-net}
-      DOCKER_AUTOREMOVE_EXITED_CONTAINERS: 1
-      DOCKER_REGISTRY_URL: ${SERVICE_URL_REGISTRY}
-      DOCKER_REGISTRY_USERNAME: ${REGISTRY_USERNAME:-trigger}
-      DOCKER_REGISTRY_PASSWORD: "${REGISTRY_PASSWORD:-very-secure-indeed}"
-      DEBUG: 1
-      ENFORCE_MACHINE_PRESETS: 1
-      TRIGGER_DEQUEUE_INTERVAL_MS: 1000
-    volumes:
-      - "shared-data:/home/node/shared"
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "http.get('http://localhost:8020/health', res => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 10s
+supervisor:
+  networks:
+    - trigger-net
+  image: "ghcr.io/triggerdotdev/supervisor:v4-beta"
+  restart: unless-stopped
+  depends_on:
+    - trigger
+    - registry
+  user: root
+  command: "sh -c \"chown -R node:node /home/node/shared && exec /usr/bin/dumb-init -- pnpm run --filter supervisor start\"\n"
+  environment:
+    TRIGGER_API_URL: http://trigger:3000
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://trigger:3000/otel
+    TRIGGER_WORKER_TOKEN: "file:///home/node/shared/worker_token"
+    MANAGED_WORKER_SECRET: ${SERVICE_PASSWORD_MANAGEDWORKER}
+    TRIGGER_WORKLOAD_API_DOMAIN: supervisor
+    TRIGGER_WORKLOAD_API_PORT_EXTERNAL: 8020
+    DOCKER_HOST: unix:///var/run/docker.sock # Direct socket access
+    DOCKER_RUNNER_NETWORKS: ${DOCKER_RUNNER_NETWORKS:-trigger-net}
+    DOCKER_AUTOREMOVE_EXITED_CONTAINERS: 1
+    DOCKER_REGISTRY_URL: ${SERVICE_URL_REGISTRY}
+    DOCKER_REGISTRY_USERNAME: ${REGISTRY_USERNAME:-trigger}
+    DOCKER_REGISTRY_PASSWORD: "${REGISTRY_PASSWORD:-very-secure-indeed}"
+    DEBUG: 1
+    ENFORCE_MACHINE_PRESETS: 1
+    TRIGGER_DEQUEUE_INTERVAL_MS: 1000
+  volumes:
+    - "shared-data:/home/node/shared"
+    - "/var/run/docker.sock:/var/run/docker.sock" # Mount socket directly
+  healthcheck:
+    test:
+      [
+        "CMD",
+        "node",
+        "-e",
+        "http.get('http://localhost:8020/health', res => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))",
+      ]
+    interval: 30s
+    timeout: 10s
+    retries: 5
+    start_period: 10s
 
-  docker-proxy:
-    networks:
-      - trigger-net
-    image: "tecnativa/docker-socket-proxy:latest"
-    restart: unless-stopped
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-    environment:
-      LOG_LEVEL: info
-      POST: 1
-      CONTAINERS: 1
-      IMAGES: 1
-      INFO: 1
-      NETWORKS: 1
-    healthcheck:
-      test: ["CMD", "nc", "-z", "127.0.0.1", "2375"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-
+# Remove docker-proxy service entirely
 volumes:
   postgres-data:
   redis-data:
